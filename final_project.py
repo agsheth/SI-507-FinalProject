@@ -10,7 +10,7 @@ OMDB_API = f'http://www.omdbapi.com/?apikey={API_KEY}&'
 
 year = str(input("Enter a Year [1910-2020]: "))
 genre = str(input("Enter a Genre [Action, Drama, Comedy etc.]: ")).lower()
-sortby = str(input("Display Ratings [Rotten Tomatoes, IMDB Rating, Metacritic Score or All]: ")).lower()
+sortby = str(input("Display Ratings [Rotten Tomatoes, IMDB, Metacritic or All]: ")).lower()
 
 page_url_year_genre = f"https://letterboxd.com/films/ajax/popular/year/{year}/genre/{genre}/size/small/" 
 
@@ -88,7 +88,6 @@ url_text = make_cache_request(page_url_year_genre, CACHE_DICT)
 r = requests.get(page_url_year_genre)
 soup = BeautifulSoup(r.text, 'html.parser')
 
-### CLASS DEFS ###
 class MovieInfo:
     '''a Movie Information class
 
@@ -158,7 +157,6 @@ class MovieRatings:
         movie_dict = {'title': self.title,'metacritic': self.metacritic, 'tomato': self.tomato, 'imdb': self.imdb}
         return movie_dict
 
-### FUNCTIONS ###
 def get_title(url):
     '''Scrapes the web page associated with a movie URL and returns the title 
     
@@ -397,7 +395,7 @@ def load_graph(xvals, yvals):
     '''
     bar_data = go.Bar(x=xvals, y=yvals)
     fig = go.Figure(data=bar_data)
-    fig.update_layout(xaxis_title = "Film Title", yaxis_title = "Rating")
+    fig.update_layout(xaxis_title = f"Film Title {year} + {genre}".upper(), yaxis_title = "Rating".upper())
     fig.show() 
 
 def load_na_graph(xvals, y_mc, y_rt, y_im):
@@ -425,11 +423,10 @@ def load_na_graph(xvals, y_mc, y_rt, y_im):
     go.Bar(name='Metacritic', x=xvals, y=y_mc),
     go.Bar(name='Rotten Tomatoes', x=xvals, y=y_rt),
     go.Bar(name='IMDB', x=xvals, y=y_im)])
-    fig.update_layout(xaxis_title = "Film Title", yaxis_title = "Rating")
+    fig.update_layout(xaxis_title = f"Film Titles {year} + {genre}".upper(), yaxis_title = "Rating".upper())
     fig.show()
 
 
-###MAIN###
 if __name__=="__main__":
     urls = []
     for link in soup.find('ul').find_all('a'):
@@ -500,7 +497,7 @@ if __name__=="__main__":
 
     cmd_result = create_command_results(year, genre)
 
-    if sortby == "metacritic score":
+    if sortby == "metacritic":
         xvals = []
         for item in cmd_result:
             xvals.append(item[1])
@@ -530,7 +527,7 @@ if __name__=="__main__":
                     yvals.append(0)    
         load_graph(xvals, yvals)
 
-    if sortby == "imdb rating":
+    if sortby == "imdb":
         xvals = []
         for item in cmd_result:
             xvals.append(item[1])  
