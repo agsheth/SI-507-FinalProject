@@ -14,15 +14,25 @@ sortby = str(input("Display Ratings [Rotten Tomatoes, IMDB Rating, Metacritic Sc
 
 page_url_year_genre = f"https://letterboxd.com/films/ajax/popular/year/{year}/genre/{genre}/size/small/" 
 
-### OPEN DB ###
 conn = sqlite3.connect("movies.db")
 cur = conn.cursor()
 
-### CACHE ###
 CACHE_DICT = {}
 CACHE_FILE_NAME = 'cache.json'
 
 def load_cache():
+    ''' Opens a cache file if it exists and loads its contents into
+    CACHE_DICT.
+    If the cache file doesn't exist, it creates a new cache dictionary
+    
+    Parameters
+    ----------
+    None
+    
+    Returns
+    -------
+    cache: dict
+    '''
     try:
         cache_file = open(CACHE_FILE_NAME, 'r')
         cache_file_contents = cache_file.read()
@@ -33,12 +43,36 @@ def load_cache():
     return cache
 
 def save_cache(cache): 
+    ''' Saves the current state of the cache to disk
+
+    Parameters
+    ----------
+    cache: dict
+
+    Returns
+    -------
+    None
+    '''
     cache_file = open(CACHE_FILE_NAME, 'w')
     contents_to_write = json.dumps(cache)
     cache_file.write(contents_to_write)
     cache_file.close()
 
 def make_cache_request(url, cache):
+    '''Make a request to the Web page using the baseurl and cache
+    
+    Parameters
+    ----------
+    baseurl: string
+        The URL for the web page
+    cache: dictionary
+        A dictionary of cached data
+    
+    Returns
+    -------
+    str
+        the data returned from making the request in a string
+    '''
     if url in cache.keys(): 
         print("Using cache")
         return cache[url]
@@ -49,7 +83,6 @@ def make_cache_request(url, cache):
         save_cache(cache)
         return cache[url]
 
-### MAKE SOUP ###
 CACHE_DICT = load_cache()
 url_text = make_cache_request(page_url_year_genre, CACHE_DICT)
 r = requests.get(page_url_year_genre)
@@ -57,8 +90,27 @@ soup = BeautifulSoup(r.text, 'html.parser')
 
 ### CLASS DEFS ###
 class MovieInfo:
+    '''a Movie Information class
+
+    Instance Attributes
+    -------------------
+    title: string
+        the title of the movie
+    
+    year: string
+        the year the movie was released
+
+    director: string
+        the director of the movie
+
+    genre: string
+        the genre of the movie, as provided by the search parameters
+
+    runtime: integer
+        the runtime of the film
+    '''
     def __init__(self, title="No Title", year=None,
-     director="No Director", genre=genre, runtime=None):
+     director=None, genre=genre, runtime=None):
         self.title = title
         self.year = year
         self.director = director
@@ -77,6 +129,22 @@ class MovieInfo:
         return movie_dict
 
 class MovieRatings:
+    '''a Movie Ratings class
+
+    Instance Attributes
+    -------------------
+    title: string
+        the title of the movie
+    
+    metacritic: string
+        the metacritic score of the movie
+
+    tomato: string
+        the rotten tomato score of the movie
+
+    imdb: string
+        the imdb rating of the movie
+    '''
     def __init__(self, title="No Title", metacritic=None, tomato=None, imdb=None):
         self.title = title
         self.metacritic = metacritic
@@ -92,6 +160,18 @@ class MovieRatings:
 
 ### FUNCTIONS ###
 def get_title(url):
+    '''Scrapes the web page associated with a movie URL and returns the title 
+    
+    Parameters
+    ----------
+    url: string
+        The URL for the web page
+    
+    Returns
+    -------
+    MovieInfo(title): class
+        a class instance of MovieInfo with a provided title
+    '''
     r = requests.get(url, allow_redirects=False)
     soup = BeautifulSoup(r.text, 'html.parser')
     try:
@@ -104,6 +184,18 @@ def get_title(url):
     return MovieInfo(title)
 
 def get_imdb_info(title):
+    '''Accesses the OMDB API and returns the associated imdb_id
+    
+    Parameters
+    ----------
+    title: string
+        Title provided by the get_title() function, scraped from webpage. 
+    
+    Returns
+    -------
+    imdb_id: string
+        the imdb assocaited with the title used to get more detailed information
+    '''
     title = title.replace("+", '&')
     if title == "Twelve Monkeys":
         title = "12 Monkeys"
@@ -119,6 +211,18 @@ def get_imdb_info(title):
         return "Movie Info Not Found"
 
 def format_movie_data(info):
+    '''Formats the information from the OMDB API for the MovieInfo Class
+    
+    Parameters
+    ----------
+    info: string
+        imdb_id associated with the film
+    
+    Returns
+    -------
+    MovieInfo(title, year, director, genre, runtime): class
+        the MovieInfo class associated with the imdb_id, and the provided data from the returned json in the correct order.  
+    '''
     params = {'i': info}
     results = requests.get(OMDB_API, params=params).json()
     try:
@@ -140,6 +244,18 @@ def format_movie_data(info):
     return MovieInfo(title, year, director, genre, runtime).get_movie_dict() 
 
 def format_rating_rata(info):
+    '''Formats the information from the OMDB API for the MovieRatings Class
+    
+    Parameters
+    ----------
+    info: string
+        imdb_id associated with the film
+    
+    Returns
+    -------
+    MovieRatings(title, metacritic, tomato, imdb): class
+        the MovieInfo class associated with the imdb_id, and the provided data from the returned json in the correct order.  
+    '''
     params = {'i': info}
     results = requests.get(OMDB_API, params=params).json()
     try:
@@ -174,7 +290,21 @@ def format_rating_rata(info):
         imdb_rating = None
     return MovieRatings(title, metacritic, tomato, imdb_rating).get_movie_info_dict()
 
-def create_info_tables(year): 
+def create_info_tables(year, genre):
+    '''Creates the info table in SQL 
+    
+    Parameters
+    ----------
+    year: string
+        The year the table is associated with
+    
+    genre: string
+        The genre the table is associated with
+    
+    Returns
+    -------
+    None
+    ''' 
     drop_table = f'''
     DROP TABLE IF EXISTS "Film_Info_{year}_{genre}";
     '''
@@ -191,7 +321,21 @@ def create_info_tables(year):
     cur.execute(drop_table)
     cur.execute(create_table)
 
-def create_rating_tables(year): 
+def create_rating_tables(year, genre): 
+    '''Creates the rating table in SQL 
+    
+    Parameters
+    ----------
+    year: string
+        The year the table is associated with
+    
+    genre: string
+        The genre the table is associated with
+    
+    Returns
+    -------
+    None
+    '''
     drop_table = f'''
     DROP TABLE IF EXISTS "Film_Ratings_{year}_{genre}";
     '''
@@ -207,7 +351,21 @@ def create_rating_tables(year):
     cur.execute(drop_table)
     cur.execute(create_table)
 
-def create_command_results():
+def create_command_results(year, genre):
+    '''Creates the appropriate command for results for the visualization.
+    
+    Parameters
+    ----------
+    year: string
+        The year the table is associated with
+    
+    genre: string
+        The genre the table is associated with
+    
+    Returns
+    -------
+    None
+    '''
     connection = sqlite3.connect("movies.db")
     cur = connection.cursor()
     
@@ -222,14 +380,47 @@ def create_command_results():
 
     return result
 
-##ADD LABELS
 def load_graph(xvals, yvals):
+    '''Creates a bar graph for the associated rating category
+    
+    Parameters
+    ----------
+    xvals: list
+        A list of strings for the x values
+    
+    yvlas: list
+        A list of strings for the y values
+    
+    Returns
+    -------
+    None
+    '''
     bar_data = go.Bar(x=xvals, y=yvals)
     fig = go.Figure(data=bar_data)
     fig.update_layout(xaxis_title = "Film Title", yaxis_title = "Rating")
     fig.show() 
 
 def load_na_graph(xvals, y_mc, y_rt, y_im):
+    '''Creates a bar graph for all rating categories
+    
+    Parameters
+    ----------
+    xvals: list
+        A list of strings for the x values
+    
+    y_mc: list
+        A list of strings for the y values
+    
+    y_rt: list
+        A list of strings for the y values
+    
+    y_im: list
+        A list of strings for the y values
+    
+    Returns
+    -------
+    None
+    '''
     fig = go.Figure(data=[
     go.Bar(name='Metacritic', x=xvals, y=y_mc),
     go.Bar(name='Rotten Tomatoes', x=xvals, y=y_rt),
@@ -274,8 +465,8 @@ if __name__=="__main__":
             rating_list.append(val)
         final_rating_list.append(rating_list)
 
-    create_info_tables(year)
-    create_rating_tables(year)
+    create_info_tables(year, genre)
+    create_rating_tables(year, genre)
 
     insert_info_data = f'''
     INSERT INTO "Film_Info_{year}_{genre}"
@@ -307,7 +498,7 @@ if __name__=="__main__":
     cur.execute(delete_empty_ratings)
     conn.commit()
 
-    cmd_result = create_command_results()
+    cmd_result = create_command_results(year, genre)
 
     if sortby == "metacritic score":
         xvals = []
@@ -339,7 +530,7 @@ if __name__=="__main__":
                     yvals.append(0)    
         load_graph(xvals, yvals)
 
-    if sortby == "imdb ratings":
+    if sortby == "imdb rating":
         xvals = []
         for item in cmd_result:
             xvals.append(item[1])  
